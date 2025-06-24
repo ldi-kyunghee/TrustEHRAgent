@@ -9,9 +9,10 @@ TrustEHRAgent is a confidence-aware LLM agent that incorporates step-wise confid
 
 ## 🌟 Features
 
-- **Confidence-Aware Clinical AI**: Step-wise confidence estimation to address hallucination risks
-- **HCAcc@k% Metric**: Novel evaluation metric quantifying accuracy-reliability trade-offs
-- **Trustworthy Decision Support**: Delivers accurate information when confident, expresses uncertainty when not
+- **Confidence-Aware Clinical AI**: TrustEHRAgent incorporates step-wise confidence estimation to address hallucination risks in clinical decision support
+- **HCAcc@k% Metric**: Novel evaluation metric quantifying the accuracy-reliability trade-off at varying confidence thresholds
+- **Trustworthy Clinical Decision Support**: Delivers accurate information when confident, or transparently expresses uncertainty when confidence is low
+- **Strong Reliability Performance**: Achieves substantial improvements of 44.23%p and 25.34%p at HCAcc@70% on MIMIC-III and eICU datasets
 
 ## 🚀 Quick Start
 
