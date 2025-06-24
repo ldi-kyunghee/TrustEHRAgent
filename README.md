@@ -1,10 +1,8 @@
 # 🛡️ TrustEHRAgent ⚕️
 
-> **Trustworthy Agents for Electronic Health Records through Confidence Estimation**
-
 [![arXiv](https://img.shields.io/badge/arXiv-TBA-b31b1b.svg)](TBA)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-
+The official repository for the code of the paper "[Trustworthy Agents for Electronic Health Records through Confidence Estimation](TBD)".
 TrustEHRAgent is a confidence-aware LLM agent that incorporates step-wise confidence estimation for reliable clinical question answering on Electronic Health Records (EHRs). This work addresses critical hallucination risks in clinical AI systems by introducing novel confidence estimation mechanisms.
 
 ## 🌟 Features
