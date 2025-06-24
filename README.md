@@ -1,65 +1,80 @@
-<div align="center">
-<h1> 🛡️TrustEHRAgent⚕️ </h1>
-</div>
+# 🛡️ TrustEHRAgent ⚕️
 
-The official repository for the code of the paper "**Trustworthy Agents for Electronic Health Records through Confidence Estimation**". TrustEHRAgent is a confidence-aware LLM agent that incorporates step-wise confidence estimation for reliable clinical question answering on Electronic Health Records (EHRs).
-You can find the paper on [arXiv](TBA).
+> **Trustworthy Agents for Electronic Health Records through Confidence Estimation**
 
-This work builds upon [EHRAgent](https://github.com/wshi83/EHRAgent), introducing novel confidence estimation mechanisms and the HCAcc@k% metric to address hallucination risks in clinical AI systems.
+[![arXiv](https://img.shields.io/badge/arXiv-TBA-b31b1b.svg)](TBA)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-### Features
+TrustEHRAgent is a confidence-aware LLM agent that incorporates step-wise confidence estimation for reliable clinical question answering on Electronic Health Records (EHRs). This work addresses critical hallucination risks in clinical AI systems by introducing novel confidence estimation mechanisms.
 
-- **Confidence-Aware Clinical AI**: TrustEHRAgent incorporates step-wise confidence estimation to address hallucination risks in clinical decision support;
-- **HCAcc@k% Metric**: Novel evaluation metric quantifying the accuracy-reliability trade-off at varying confidence thresholds;
-- **Trustworthy Clinical Decision Support**: Delivers accurate information when confident, or transparently expresses uncertainty when confidence is low;
-- **Strong Reliability Performance**: Achieves substantial improvements of 44.23%p and 25.34%p at HCAcc@70% on MIMIC-III and eICU datasets;
-- **Built on EHRAgent**: Extends the code-empowered LLM agent framework with confidence estimation capabilities.
+## 🌟 Features
 
-### Data Preparation
+- **Confidence-Aware Clinical AI**: Step-wise confidence estimation to address hallucination risks
+- **HCAcc@k% Metric**: Novel evaluation metric quantifying accuracy-reliability trade-offs
+- **Trustworthy Decision Support**: Delivers accurate information when confident, expresses uncertainty when not
 
-TBD
+## 🚀 Quick Start
 
-### Credentials Preparation
-Our experiments are based on OpenAI API services. Please record your API keys and other credentials in the ``./ehragent/config.py``. 
+### Prerequisites
 
-### Setup
+- Python 3.9+
+- [uv](https://docs.astral.sh/uv/) package manager
+- OpenAI API key
 
-You can set up the environment by running the following command in your terminal using [uv](https://docs.astral.sh/uv/):
+### Installation
 
-```bash
-uv sync
-```
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/TrustEHRAgent.git
+   cd TrustEHRAgent
+   ```
 
-Then you can activate the virtual environment by running:
+2. **Set up environment**
+   ```bash
+   uv sync
+   source .venv/bin/activate
+   ```
 
-```bash
-source .venv/bin/activate
+3. **Configure credentials**
+   
+   Add your OpenAI API key to `./ehragent/config.py`:
+   ```python
+   OPENAI_API_KEY = "your-api-key-here"
+   ```
 
-```
+### Data Setup
 
-### Instructions
+Prepare MIMIC-III and eICU datasets following the [EHRAgent data preparation guide](https://github.com/wshi83/EHRAgent#data-preparation).
 
-The outputting results will be saved under the directory ``./logs/``. We provide convenient execution scripts in the ``scripts/`` directory:
+## 📋 Usage
 
-#### Quick Start Scripts
+### Basic Execution
 
-**Run Agent with MIMIC-III Dataset:**
+**MIMIC-III Dataset:**
 ```bash
 ./scripts/run_code.sh
 ```
 
-**Runt Agent with eICU Dataset:**
+**eICU Dataset:**
 ```bash
 ./scripts/run_code_eicu.sh
 ```
 
-**Confidence Estimation & Get HCAcc@k%:**
+### Confidence Analysis
+
+**Run confidence estimation and get HCAcc@k% metrics:**
 ```bash
 ./scripts/run_evaluate.sh
 ```
 
-### Citation
-If you find this repository useful, please consider citing:
+### Results
+
+All results are automatically saved to `./logs/` directory with detailed confidence scores and performance metrics.
+
+## 📚 Citation
+
+If you find this work useful, please cite:
+
 ```bibtex
 @article{trustehragent2024,
     title = "Trustworthy Agents for Electronic Health Records through Confidence Estimation",
@@ -70,5 +85,11 @@ If you find this repository useful, please consider citing:
 }
 ```
 
-### Acknowledgments
-This work builds upon [EHRAgent](https://github.com/wshi83/EHRAgent). We thank the original authors for their foundational contributions to agent systems.
+## 🙏 Acknowledgments
+
+This work builds upon [EHRAgent](https://github.com/wshi83/EHRAgent). We thank the original authors for their foundational contributions to code-empowered agent systems.
+
+
+<div align="center">
+<strong>⚠️ Important:</strong> This tool is for research purposes only. Always consult healthcare professionals for medical decisions.
+</div>
