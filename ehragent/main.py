@@ -1,111 +1,183 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-"""
-Usage example:
-
-python run_confidence_analysis.py \
-    --logs_path ./logs \
-    --answer_file ./answers.json \
-    --output_dir ./results \
-    --combining_methods unweighted,position,length,pl,last_step \
-    --confidence_checker_types standard \
-    --use_external_confidence
-"""
-
-import argparse
 import os
-from confidence_calculation import (
-    calculate_basic_stats, 
-    process_logs_and_calculate_hcacc,
-    get_raw_results_for_analysis
-)
-from enhanced_confidence_analysis import extend_main_process
+import sys
+import json
+import random
+import numpy as np
+import argparse
+import autogen
+# Add the parent directory to the Python path so tools can be imported
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ehragent.toolset_high import *
+from ehragent.medagent import MedAgent
+from ehragent.config import openai_config, llm_config_list
+import time
+
+def judge(pred, ans):
+    old_flag = True
+    if not ans in pred:
+        old_flag = False
+    if "True" in pred:
+        pred = pred.replace("True", "1")
+    else:
+        pred = pred.replace("False", "0")
+    if ans == "False" or ans == "false":
+        ans = "0"
+    if ans == "True" or ans == "true":
+        ans = "1"
+    if ans == "No" or ans == "no":
+        ans = "0"
+    if ans == "Yes" or ans == "yes":
+        ans = "1"
+    if ans == "None" or ans == "none":
+        ans = "0"
+    if ", " in ans:
+        ans = ans.split(', ')
+    if ans[-2:] == ".0":
+        ans = ans[:-2]
+    if not type(ans) == list:
+        ans = [ans]
+    new_flag = True
+    for i in range(len(ans)):
+        if not ans[i] in pred:
+            new_flag = False
+            break
+    return (old_flag or new_flag)
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
 
 def main():
-    parser = argparse.ArgumentParser(description='Analyze confidence scores in log files')
-    parser.add_argument('--logs_path', type=str, required=True, help='Path to log files')
-    parser.add_argument('--answer_file', type=str, required=True, help='Path to answer file')
-    parser.add_argument('--output_dir', type=str, help='Output directory for results')
-    parser.add_argument('--combining_methods', type=str, default='unweighted,position,length,pl,last_step', 
-                        help='Comma-separated list of combining methods')
-    parser.add_argument('--confidence_checker_types', type=str, default='standard', 
-                        help='Comma-separated list of confidence checker types (standard, binary, integer)')
-    parser.add_argument('--verbose', action='store_true', help='Print detailed information')
-    parser.add_argument('--use_external_confidence', action='store_true', help='Calculate external confidence scores')
-    parser.add_argument('--external_confidence_model', type=str, default='gpt-4.1', 
-                        help='Model to use for external confidence evaluation')
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--llm", type=str, default="<YOUR_LLM_NAME>")
+    parser.add_argument("--num_questions", type=int, default=1)
+    parser.add_argument("--dataset", type=str, default="mimic_iii")
+    parser.add_argument("--data_path", type=str, default="<YOUR_DATASET_PATH>")
+    parser.add_argument("--logs_path", type=str, default="<YOUR_LOGS_PATH>")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--debug_id", type=str, default="521fd2885f51641a963f8d3e")
+    parser.add_argument("--start_id", type=int, default=0)
+    parser.add_argument("--num_shots", type=int, default=4)
     args = parser.parse_args()
-    
-    # Set output directory
-    output_dir = args.output_dir if args.output_dir else args.logs_path
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Parse combining methods and checker types
-    combining_methods = args.combining_methods.split(',')
-    confidence_checker_types = args.confidence_checker_types.split(',')
-    
-    # Set section inclusion - all sections included by default
-    include_knowledge = True
-    include_solution = True
-    include_examples = True
-    
-    # Calculate basic stats
-    stats = calculate_basic_stats(args.logs_path, args.answer_file)
-    
-    print("Basic Stats:")
-    print(f"Total questions: {stats['total_num']}")
-    print(f"Correct: {stats['correct']} ({stats['correct']/stats['total_num']*100:.2f}%)")
-    print(f"Incorrect: {stats['incorrect']} ({stats['incorrect']/stats['total_num']*100:.2f}%)")
-    print(f"Unfinished: {stats['unfinished']} ({stats['unfinished']/stats['total_num']*100:.2f}%)")
-    
-    # Add 'external' to combining methods if using external confidence
-    if args.use_external_confidence and 'external' not in combining_methods:
-        combining_methods.append('external')
-        print("\nAdded 'external' method for confidence analysis.")
-    
-    # If using external confidence, run the full HcACC calculation first
-    # This will generate the external confidence results files
-    if args.use_external_confidence:
-        print("\nCalculating external confidence scores...")
-        # We only need k=0 for this purpose
-        k_values = [0]
-        
-        process_logs_and_calculate_hcacc(
-            args.logs_path,
-            args.answer_file,
-            k_values,
-            combining_methods,
-            args.use_external_confidence,
-            confidence_checker_types,
-            args.external_confidence_model,
-            output_dir,
-            args.verbose,
-            include_knowledge,
-            include_solution,
-            include_examples
-        )
-        print("External confidence scores calculated and saved.")
-    
-    # Perform enhanced confidence analysis
-    print("\nPerforming confidence analysis...")
-    
-    # Start with empty result structure and extract data directly from log files
-    analysis_results = extend_main_process(
-        {}, # Start with empty result structure
-        output_dir, 
-        args.logs_path,
-        args.answer_file,
-        combining_methods,
-        confidence_checker_types,
-        args.use_external_confidence  # Pass the flag to consider external confidence
+    set_seed(args.seed)
+    if args.dataset == 'mimic_iii':
+        from ehragent.prompts_mimic import EHRAgent_4Shots_Knowledge
+    else:
+        from ehragent.prompts_eicu import EHRAgent_4Shots_Knowledge
+
+    config_list = [openai_config(args.llm)]
+    llm_config = llm_config_list(args.seed, config_list)
+
+    print("llm_config: ", llm_config)
+
+    chatbot = autogen.agentchat.AssistantAgent(
+        name="chatbot",
+        system_message="For coding tasks, only use the functions you have been provided with. Reply TERMINATE when the task is done. Save the answers to the questions in the variable 'answer'. Please only generate the code.",
+        llm_config=llm_config,
     )
-    
-    print("Confidence analysis completed.")
-    print(f"Analysis results can be found in: {os.path.join(output_dir, 'confidence_analysis')}")
-    
-    return analysis_results
+
+    user_proxy = MedAgent(
+        name="user_proxy",
+        is_termination_msg=lambda x: x.get("content", "") and x.get("content", "").rstrip().endswith("TERMINATE"),
+        human_input_mode="NEVER",
+        max_consecutive_auto_reply=10,
+        code_execution_config={"work_dir": "coding", "use_docker": False},
+        config_list=config_list,
+    )
+
+    # register the functions
+    user_proxy.register_function(
+        function_map={
+            "python": run_code
+        }
+    )
+
+    user_proxy.register_dataset(args.dataset)
+
+    file_path = args.data_path
+    # read from json file
+    with open(file_path, 'r') as f:
+        contents = json.load(f)
+
+    # random shuffle
+    import random
+    random.shuffle(contents)
+    file_path = "{}/{}/".format(args.logs_path, args.num_shots) + "{id}.txt"
+
+    start_time = time.time()
+    if args.num_questions == -1:
+        args.num_questions = len(contents)
+    long_term_memory = []
+    init_memory = EHRAgent_4Shots_Knowledge
+    init_memory = init_memory.split('\n\n')
+    for i in range(len(init_memory)):
+        item = init_memory[i]
+        item = item.split('Question:')[-1]
+        question = item.split('\nKnowledge:\n')[0]
+        item = item.split('\nKnowledge:\n')[-1]
+        knowledge = item.split('\nSolution:')[0]
+        code = item.split('\nSolution:')[-1]
+        new_item = {"question": question, "knowledge": knowledge, "code": code}
+        long_term_memory.append(new_item)
+
+    for i in range(args.start_id, args.num_questions):
+        # if file is already exist, skip
+        file_directory = file_path.format(id=contents[i]['id'])
+        if os.path.exists(file_directory):
+            print("File already exists, skipping...")
+            continue
+        if args.debug and contents[i]['id'] != args.debug_id:
+            continue
+        question = contents[i]['template']
+        answer = contents[i]['answer']
+        try:
+            user_proxy.update_memory(args.num_shots, long_term_memory)
+            user_proxy.initiate_chat(
+                chatbot,
+                message=question,
+            )
+            logs = user_proxy._oai_messages
+
+            logs_string = []
+            logs_string.append(str(question))
+            logs_string.append(str(answer))
+            for agent in list(logs.keys()):
+                for j in range(len(logs[agent])):
+                    if logs[agent][j]['content'] != None:
+                        logs_string.append(logs[agent][j]['content'])
+                    else:
+                        argums = logs[agent][j]['function_call']['arguments']
+                        if type(argums) == dict and 'cell' in argums.keys():
+                            logs_string.append(argums['cell'])
+                        else:
+                            logs_string.append(argums)
+        except Exception as e:
+            print("Error: ", e)
+            logs_string = [str(e)]
+        file_directory = file_path.format(id=contents[i]['id'])
+        if type(answer) == list:
+            answer = ', '.join(answer)
+        logs_string.append("Ground-Truth Answer ---> "+answer)
+        # Add directories if they do not exist
+        os.makedirs(os.path.dirname(file_directory), exist_ok=True)
+        with open(file_directory, 'w') as f:
+            f.write('\n----------------------------------------------------------\n'.join(logs_string))
+        logs_string = '\n----------------------------------------------------------\n'.join(logs_string)
+        if '"cell": "' in logs_string:
+            last_code_start = logs_string.rfind('"cell": "')
+            last_code_end = logs_string.rfind('"\n}')
+            last_code = logs_string[last_code_start+9:last_code_end]
+        else:
+            last_code_end = logs_string.rfind('Solution:')
+        prediction_end = logs_string.rfind('TERMINATE')
+        prediction = logs_string[last_code_end:prediction_end]
+        result = judge(prediction, answer)
+        if result:
+            new_item = {"question": question, "knowledge": user_proxy.knowledge, "code": user_proxy.code}
+            long_term_memory.append(new_item)
+    end_time = time.time()
+    print("Time elapsed: ", end_time - start_time)
 
 if __name__ == "__main__":
     main()

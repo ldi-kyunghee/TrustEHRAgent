@@ -181,3 +181,4 @@ data/
 .claude
 results
 test
+logs/

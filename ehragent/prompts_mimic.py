@@ -1,10 +1,10 @@
-CodeHeader = """from tools import eicu_tabtools, calculator
+CodeHeader = """from tools import tabtools, calculator
 Calculate = calculator.wolfram_alpha_calculator
-LoadDB = eicu_tabtools.db_loader
-FilterDB = eicu_tabtools.data_filter
-GetValue = eicu_tabtools.get_value
-SQLInterpreter = eicu_tabtools.sql_interpreter
-Calendar = eicu_tabtools.date_calculator
+LoadDB = tabtools.db_loader
+FilterDB = tabtools.data_filter
+GetValue = tabtools.get_value
+SQLInterpreter = tabtools.sql_interpreter
+Calendar = tabtools.date_calculator
 """
 
 RetrKnowledge = """Read the following data descriptions, generate the background knowledge as the context information that could be helpful for answering the question.

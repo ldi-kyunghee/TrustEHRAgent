@@ -8,23 +8,25 @@ import Levenshtein
 
 def db_loader(target_ehr):
     ehr_mappings = {
-        "admissions":"data/mimic_iii/ADMISSIONS.csv",
-        "chartevents":"data/mimic_iii/CHARTEVENTS.csv",
-        "cost":"data/mimic_iii/COST.csv",
-        "d_icd_diagnoses":"data/mimic_iii/D_ICD_DIAGNOSES.csv",
-        "d_icd_procedures":"data/mimic_iii/D_ICD_PROCEDURES.csv",
-        "d_items":"data/mimic_iii/D_ITEMS.csv",
-        "d_labitems":"data/mimic_iii/D_LABITEMS.csv",
-        "diagnoses_icd":"data/mimic_iii/DIAGNOSES_ICD.csv",
-        "icustays":"data/mimic_iii/ICUSTAYS.csv",
-        "inputevents_cv":"data/mimic_iii/INPUTEVENTS_CV.csv",
-        "labevents":"data/mimic_iii/LABEVENTS.csv",
-        "microbiologyevents":"data/mimic_iii/MICROBIOLOGYEVENTS.csv",
-        "outputevents":"data/mimic_iii/OUTPUTEVENTS.csv",
-        "patients":"data/mimic_iii/PATIENTS.csv",
-        "prescriptions":"data/mimic_iii/PRESCRIPTIONS.csv",
-        "procedures_icd":"data/mimic_iii/PROCEDURES_ICD.csv",
-        "transfers":"data/mimic_iii/TRANSFERS.csv"
+        "patient":"data/eicu/patient.csv",
+        "admissiondrug":"data/eicu/admissionDrug.csv",
+        "allergy":"data/eicu/allergy.csv",
+        "careplantarget":"data/eicu/carePlanTarget.csv",
+        "careplangoal":"data/eicu/carePlanGoal.csv",
+        "diagnosis":"data/eicu/diagnosis.csv",
+        "hospital":"data/eicu/hospital.csv",
+        "infusiondrug":"data/eicu/infusionDrug.csv",
+        "intakeoutput":"data/eicu/intakeOutput.csv",
+        "lab":"data/eicu/lab.csv",
+        "medication":"data/eicu/medication.csv",
+        "microlab":"data/eicu/microLab.csv",
+        "nursecharting":"data/eicu/nurseCharting.csv",
+        "pasthistory":"data/eicu/pastHistory.csv",
+        "physicalexam":"data/eicu/physicalExam.csv",
+        "respiratorycharting":"data/eicu/respiratoryCharting.csv",
+        "treatment":"data/eicu/treatment.csv",
+        "vitalaperiodic":"data/eicu/vitalAperiodic.csv",
+        "vitalperiodic":"data/eicu/vitalPeriodic.csv"
     }
     data = pd.read_csv(ehr_mappings[target_ehr])
     column_names = ', '.join(data.columns.tolist())
@@ -188,7 +190,7 @@ def get_value(data, argument):
         raise Exception("The column name {} is incorrect. Please check the column name and make necessary changes. The columns in this table include {}.".format(column, column_values))
 
 def sql_interpreter(command):
-    db_path = "data/mimic_iii/mimic_iii.db"
+    db_path = "data/eicu/eicu.db"
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     results = cur.execute(command).fetchall()
@@ -196,7 +198,7 @@ def sql_interpreter(command):
 
 def date_calculator(argument):
     try:
-        db_path = "data/mimic_iii/mimic_iii.db"
+        db_path = "data/eicu/eicu.db"
         con = sqlite3.connect(db_path)
         cur = con.cursor()
         command = "select datetime(current_time, '{}')".format(argument)

@@ -1,10 +1,10 @@
-CodeHeader = """from tools import tabtools, calculator
+CodeHeader = """from tools import eicu_tabtools, calculator
 Calculate = calculator.wolfram_alpha_calculator
-LoadDB = lambda x: tabtools.db_loader(x, 'eicu')
-FilterDB = tabtools.data_filter
-GetValue = tabtools.get_value
-SQLInterpreter = lambda x: tabtools.sql_interpreter(x, 'eicu')
-Calendar = lambda x: tabtools.date_calculator(x, 'eicu')
+LoadDB = eicu_tabtools.db_loader
+FilterDB = eicu_tabtools.data_filter
+GetValue = eicu_tabtools.get_value
+SQLInterpreter = eicu_tabtools.sql_interpreter
+Calendar = eicu_tabtools.date_calculator
 """
 
 RetrKnowledge = """Read the following data descriptions, generate the background knowledge as the context information that could be helpful for answering the question.
@@ -77,7 +77,6 @@ assumption, collect additional info you need, and think of a different approach 
 When you find an answer, verify the answer carefully. Include verifiable evidence in your response
 if possible.
 For each code solution, include a confidence rating on a scale from 0-10 at the top of your code as a comment in the format '# Confidence: X' (where X is a number from 0 to 10). Use a highly critical standard for this rating. Consider data limitations, interpretation ambiguities, and error propagation risks. Use higher scores only when genuinely confident.
-
 Reply "TERMINATE" in the end when everything is done."""
 
 EHRAgent_Message_Prompt = """Assume you have knowledge of several tables:
