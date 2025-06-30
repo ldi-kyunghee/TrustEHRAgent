@@ -9,7 +9,7 @@ import autogen
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ehragent.toolset_high import *
 from ehragent.medagent import MedAgent
-from ehragent.config import openai_config, llm_config_list
+from ehragent.config import get_model_config, llm_config_list
 import time
 
 def judge(pred, ans):
@@ -66,7 +66,7 @@ def main():
     else:
         from ehragent.prompts_eicu import EHRAgent_4Shots_Knowledge
 
-    config_list = [openai_config(args.llm)]
+    config_list = [get_model_config(args.llm)]
     llm_config = llm_config_list(args.seed, config_list)
 
     print("llm_config: ", llm_config)
@@ -132,6 +132,9 @@ def main():
         question = contents[i]['template']
         answer = contents[i]['answer']
         try:
+            # Initialize confidence scorer with conversation ID
+            user_proxy.initialize_confidence_scorer(contents[i]['id'])
+            
             user_proxy.update_memory(args.num_shots, long_term_memory)
             user_proxy.initiate_chat(
                 chatbot,
@@ -159,6 +162,10 @@ def main():
         if type(answer) == list:
             answer = ', '.join(answer)
         logs_string.append("Ground-Truth Answer ---> "+answer)
+        
+        # Save confidence summary separately (no longer in main log)
+        user_proxy.save_final_confidence_summary(question, answer, logs_string)
+        
         # Add directories if they do not exist
         os.makedirs(os.path.dirname(file_directory), exist_ok=True)
         with open(file_directory, 'w') as f:

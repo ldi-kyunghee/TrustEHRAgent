@@ -1,17 +1,16 @@
 import time
-from typing import Dict, List, Optional, Union, Callable, Literal, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable, Literal
 import logging
 import asyncio
-import openai
 import json
 import os
 import sys
 # Add the parent directory to the Python path so tools can be imported
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from openai import OpenAI, AzureOpenAI
 from autogen import Agent, UserProxyAgent, ConversableAgent
 from termcolor import colored
 import Levenshtein
+from ehragent.confidence_scorer import AgentStepConfidenceScorer
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +43,9 @@ class MedAgent(UserProxyAgent):
         self.question = ''
         self.code = ''
         self.knowledge = ''
+        self.conversation_id = None
+        self.confidence_scorer = None
+        self.last_response = None  # Store last OpenAI response for logprob analysis
         
     def retrieve_knowledge(self, config, query):
         # import prompt
@@ -51,35 +53,30 @@ class MedAgent(UserProxyAgent):
             from ehragent.prompts_mimic import RetrKnowledge
         else:
             from ehragent.prompts_eicu import RetrKnowledge
+        
+        from ehragent.model_client import create_model_client
+        
         # Returns the related information to the given query.
         patience = 2
         sleep_time = 30
-        openai.api_type = config["api_type"]
-        # openai.api_base = config["base_url"]
-        # openai.api_version = config["api_version"]
-        openai.api_key = config["api_key"]
-        engine = config["model"]
+        
         query_message = RetrKnowledge.format(question=query)
         messages = [{"role":"system","content":"You are an AI assistant that helps people find information."},
                     {"role":"user","content": query_message}]
-        client = OpenAI(
-            api_key=config["api_key"],
-            # azure_endpoint=config["base_url"],
-            # api_version=config["api_version"],
-        )
+        
+        # Use our model client instead of direct OpenAI client
+        client = create_model_client(config)
+        
         while patience > 0:
             patience -= 1
             try:
-                response = client.chat.completions.create(
-                    model=engine,
-                    messages = messages,
+                response = client.chat_completion(
+                    messages=messages,
                     temperature=0,
                     max_tokens=800,
-                    top_p=0.95,
-                    frequency_penalty=0,
-                    presence_penalty=0,
-                    stop=None)
-                prediction = response.choices[0].message.content.strip()
+                    top_p=0.95
+                )
+                prediction = response["content"].strip()
                 if prediction != "" and prediction != None:
                     return prediction
             except Exception as e:
@@ -138,6 +135,17 @@ class MedAgent(UserProxyAgent):
         silent: Optional[bool] = False,
     ):
         self._process_received_message(message, sender, silent)
+        
+        # Score the received message
+        if self.confidence_scorer:
+            message_content = message if isinstance(message, str) else message.get("content", "")
+            if message_content:
+                self.confidence_scorer.score_agent_step(
+                    step_type="message_received",
+                    message_content=message_content,
+                    openai_response=self.last_response
+                )
+        
         if request_reply is False or request_reply is None and self.reply_at_receive[sender] is False:
             return
         reply = self.generate_reply(messages=self.chat_messages[sender], sender=sender)
@@ -150,35 +158,30 @@ class MedAgent(UserProxyAgent):
             from ehragent.prompts_mimic import CodeDebugger
         else:
             from ehragent.prompts_eicu import CodeDebugger
+        
+        from ehragent.model_client import create_model_client
+        
         # Returns the related information to the given query.
         patience = 2
         sleep_time = 30
-        # openai.api_type = config["api_type"]
-        # openai.api_base = config["base_url"]
-        # openai.api_version = config["api_version"]
-        openai.api_key = config["api_key"]
-        engine = config["model"]
+        
         query_message = CodeDebugger.format(question=self.question, code=code, error_info=error_info)
         messages = [{"role":"system","content":"You are an AI assistant that helps people debug their code. Only list one most possible reason to the errors."},
                     {"role":"user","content": query_message}]
-        client = OpenAI(
-            api_key=config["api_key"],
-            # azure_endpoint=config["base_url"],
-            # api_version=config["api_version"],
-        )
+        
+        # Use our model client instead of direct OpenAI client
+        client = create_model_client(config)
+        
         while patience > 0:
             patience -= 1
             try:
-                response = client.chat.completions.create(
-                    model=engine,
-                    messages = messages,
+                response = client.chat_completion(
+                    messages=messages,
                     temperature=0,
                     max_tokens=800,
-                    top_p=0.95,
-                    frequency_penalty=0,
-                    presence_penalty=0,
-                    stop=None)
-                prediction = response.choices[0].message.content.strip()
+                    top_p=0.95
+                )
+                prediction = response["content"].strip()
                 if prediction != "" and prediction != None:
                     return prediction
             except Exception as e:
@@ -235,6 +238,14 @@ class MedAgent(UserProxyAgent):
             reasons = self.error_debugger(self.config_list[0], self.code, content)
             content = content + '\nPotential Reasons: ' + reasons
 
+        # Score the function execution step
+        if self.confidence_scorer:
+            self.confidence_scorer.score_agent_step(
+                step_type="function_execution",
+                func_call=func_call,
+                execution_result=str(content)
+            )
+
         return is_exec_success, {
             "name": func_name,
             "role": "function",
@@ -247,3 +258,27 @@ class MedAgent(UserProxyAgent):
 
     def register_dataset(self, dataset):
         self.dataset = dataset
+    
+    def initialize_confidence_scorer(self, conversation_id: str, confidence_log_dir: str = "confidence_logs"):
+        """Initialize confidence scorer with conversation ID"""
+        self.conversation_id = conversation_id
+        self.confidence_scorer = AgentStepConfidenceScorer(conversation_id, confidence_log_dir)
+    
+    def get_confidence_scores(self) -> List[Dict[str, Any]]:
+        """Get all confidence scores for this conversation"""
+        if self.confidence_scorer:
+            return self.confidence_scorer.get_step_scores()
+        return []
+    
+    def get_confidence_summary(self) -> Dict[str, Any]:
+        """Get confidence summary for this conversation"""
+        if self.confidence_scorer:
+            return self.confidence_scorer.get_conversation_confidence_summary()
+        return {}
+    
+    def save_final_confidence_summary(self, question: str = None, answer: str = None, 
+                                    conversation_logs: List[str] = None):
+        """Save final confidence summary"""
+        if self.confidence_scorer:
+            self.confidence_scorer.save_conversation_summary(question, answer, conversation_logs)
+    
