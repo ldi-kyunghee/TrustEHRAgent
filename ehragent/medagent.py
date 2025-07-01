@@ -27,6 +27,7 @@ class MedAgent(UserProxyAgent):
         llm_config: Optional[Union[Dict, Literal[False]]] = False,
         system_message: Optional[Union[str, List]] = "",
         config_list: Optional[List[Dict]] = None,
+        turn_step_wise_confidence: Optional[bool] = True,
     ):
         super().__init__(
             name=name,
@@ -46,6 +47,7 @@ class MedAgent(UserProxyAgent):
         self.conversation_id = None
         self.confidence_scorer = None
         self.last_response = None  # Store last OpenAI response for logprob analysis
+        self.turn_step_wise_confidence = turn_step_wise_confidence
         
     def retrieve_knowledge(self, config, query):
         # import prompt
@@ -73,12 +75,14 @@ class MedAgent(UserProxyAgent):
                 response = client.chat_completion(
                     messages=messages,
                     temperature=0,
-                    max_tokens=800,
+                    max_tokens=2000,
                     top_p=0.95
                 )
-                prediction = response["content"].strip()
-                if prediction != "" and prediction != None:
-                    return prediction
+                content = response.get("content")
+                if content is not None:
+                    prediction = content.strip()
+                    if prediction != "" and prediction != None:
+                        return prediction
             except Exception as e:
                 print(e)
                 if sleep_time > 0:
@@ -111,7 +115,15 @@ class MedAgent(UserProxyAgent):
 
         examples = self.retrieve_examples(context["message"])
 
-        init_message = EHRAgent_Message_Prompt.format(examples=examples, knowledge=knowledge, question=context["message"])
+        # Modify prompt based on confidence setting
+        if self.turn_step_wise_confidence:
+            init_message = EHRAgent_Message_Prompt.format(examples=examples, knowledge=knowledge, question=context["message"])
+        else:
+            # Use prompt without confidence rating instruction
+            prompt_without_confidence = EHRAgent_Message_Prompt.replace(
+                "IMPORTANT: Begin your code solution with a confidence rating comment in the format '# Confidence: X' where X is a number from 0-10.\n", ""
+            )
+            init_message = prompt_without_confidence.format(examples=examples, knowledge=knowledge, question=context["message"])
         return init_message
     
     def send(self, message: Union[Dict, str], recipient: Agent, request_reply: Optional[bool]=None, silent: Optional[bool]=False):
@@ -134,6 +146,7 @@ class MedAgent(UserProxyAgent):
         request_reply: Optional[bool] = None,
         silent: Optional[bool] = False,
     ):
+            
         self._process_received_message(message, sender, silent)
         
         # Score the received message
@@ -178,12 +191,14 @@ class MedAgent(UserProxyAgent):
                 response = client.chat_completion(
                     messages=messages,
                     temperature=0,
-                    max_tokens=800,
+                    max_tokens=2000,
                     top_p=0.95
                 )
-                prediction = response["content"].strip()
-                if prediction != "" and prediction != None:
-                    return prediction
+                content = response.get("content")
+                if content is not None:
+                    prediction = content.strip()
+                    if prediction != "" and prediction != None:
+                        return prediction
             except Exception as e:
                 print(e)
                 if sleep_time > 0:
@@ -203,6 +218,7 @@ class MedAgent(UserProxyAgent):
             is_exec_success (boolean): whether the execution is successful.
             result_dict: a dictionary with keys "name", "role", and "content". Value of "role" is "function".
         """
+        
         func_name = func_call.get("name", "")
         func = self._function_map.get(func_name, None)
 
@@ -246,9 +262,17 @@ class MedAgent(UserProxyAgent):
                 execution_result=str(content)
             )
 
+        # Check backend and use appropriate role
+        backend = "openai"  # default
+        if hasattr(self, 'config_list') and self.config_list:
+            backend = self.config_list[0].get('backend', 'openai')
+        
+        # Together AI and Gemini use 'tool' role instead of 'function'
+        role = "tool" if backend in ["together", "google", "gemini"] else "function"
+        
         return is_exec_success, {
             "name": func_name,
-            "role": "function",
+            "role": role,
             "content": str(content),
         }
     

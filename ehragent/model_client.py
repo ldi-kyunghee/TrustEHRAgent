@@ -50,12 +50,36 @@ class OpenAIClient(ModelClient):
         )
         
         # Convert to standard format
-        return {
-            "content": response.choices[0].message.content,
+        message = response.choices[0].message
+        result = {
             "role": "assistant",
             "raw_response": response,
             "backend": "openai"
         }
+        
+        # Check for function calls
+        if hasattr(message, 'tool_calls') and message.tool_calls:
+            # Convert tool_calls to function_call format for compatibility
+            tool_call = message.tool_calls[0]
+            result["function_call"] = {
+                "name": tool_call.function.name,
+                "arguments": tool_call.function.arguments
+            }
+            result["tool_calls"] = message.tool_calls
+            result["content"] = message.content  # May be None for function calls
+        elif hasattr(message, 'function_call') and message.function_call:
+            # Handle legacy function_call format
+            result["function_call"] = {
+                "name": message.function_call.name,
+                "arguments": message.function_call.arguments
+            }
+            result["content"] = message.content
+        else:
+            result["content"] = message.content
+            # Ensure function_call is None when there are no function calls
+            result["function_call"] = None
+            
+        return result
     
     def is_available(self) -> bool:
         try:
@@ -95,12 +119,36 @@ class TogetherAIClient(ModelClient):
         )
         
         # Convert to standard format (same as OpenAI)
-        return {
-            "content": response.choices[0].message.content,
+        message = response.choices[0].message
+        result = {
             "role": "assistant",
             "raw_response": response,
             "backend": "together"
         }
+        
+        # Check for function calls
+        if hasattr(message, 'tool_calls') and message.tool_calls:
+            # Convert tool_calls to function_call format for compatibility
+            tool_call = message.tool_calls[0]
+            result["function_call"] = {
+                "name": tool_call.function.name,
+                "arguments": tool_call.function.arguments
+            }
+            result["tool_calls"] = message.tool_calls
+            result["content"] = message.content  # May be None for function calls
+        elif hasattr(message, 'function_call') and message.function_call:
+            # Handle legacy function_call format
+            result["function_call"] = {
+                "name": message.function_call.name,
+                "arguments": message.function_call.arguments
+            }
+            result["content"] = message.content
+        else:
+            result["content"] = message.content
+            # Ensure function_call is None when there are no function calls
+            result["function_call"] = None
+            
+        return result
     
     def is_available(self) -> bool:
         try:
@@ -112,13 +160,13 @@ class TogetherAIClient(ModelClient):
 
 
 class GeminiClient(ModelClient):
-    """Google Gemini API client using OpenAI client with custom base_url"""
+    """Google Gemini API client using OpenAI client with custom base_url (OpenAI compatible)"""
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         try:
             from openai import OpenAI
-            base_url = config.get("base_url", "https://generativelanguage.googleapis.com/v1beta/")
+            base_url = config.get("base_url", "https://generativelanguage.googleapis.com/v1beta/openai/")
             if not base_url.endswith("/"):
                 base_url += "/"
             
@@ -137,13 +185,29 @@ class GeminiClient(ModelClient):
             **kwargs
         )
         
-        # Convert to standard format (same as OpenAI)
-        return {
-            "content": response.choices[0].message.content,
+        # Handle function calling properly
+        message = response.choices[0].message
+        result = {
             "role": "assistant",
             "raw_response": response,
             "backend": "gemini"
         }
+        # Check for function calls
+        if hasattr(message, 'tool_calls') and message.tool_calls:
+            # Convert tool_calls to function_call format for compatibility
+            tool_call = message.tool_calls[0]
+            result["function_call"] = {
+                "name": tool_call.function.name,
+                "arguments": tool_call.function.arguments
+            }
+            result["tool_calls"] = message.tool_calls
+            result["content"] = message.content  # May be None for function calls
+        else:
+            result["content"] = message.content
+            # Ensure function_call is None when there are no function calls
+            result["function_call"] = None
+            
+        return result
     
     def is_available(self) -> bool:
         try:

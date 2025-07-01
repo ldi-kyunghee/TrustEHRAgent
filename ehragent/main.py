@@ -59,6 +59,7 @@ def main():
     parser.add_argument("--debug_id", type=str, default="521fd2885f51641a963f8d3e")
     parser.add_argument("--start_id", type=int, default=0)
     parser.add_argument("--num_shots", type=int, default=4)
+    parser.add_argument("--turn_step_wise_confidence", action="store_true", help="Enable step-wise confidence rating prompts")
     args = parser.parse_args()
     set_seed(args.seed)
     if args.dataset == 'mimic_iii':
@@ -71,9 +72,23 @@ def main():
 
     print("llm_config: ", llm_config)
 
+    # Customize system message based on backend and confidence setting
+    backend = config_list[0].get('backend', 'openai')
+    if backend == 'google' or backend == 'gemini':
+        base_message = """You are a helpful assistant that can execute Python code."""
+    else:
+        base_message = "For coding tasks, only use the functions you have been provided with. Reply TERMINATE when the task is done. Save the answers to the questions in the variable 'answer'. Please only generate the code."
+    
+    # Add confidence rating instruction if enabled
+    if args.turn_step_wise_confidence:
+        confidence_instruction = " For each code solution, include a confidence rating on a scale from 0-10 at the top of your code as a comment in the format '# Confidence: X' (where X is a number from 0 to 10). Use a highly critical standard for this rating. Consider data limitations, interpretation ambiguities, and error propagation risks. Use higher scores only when genuinely confident."
+        system_message = base_message + confidence_instruction
+    else:
+        system_message = base_message
+    
     chatbot = autogen.agentchat.AssistantAgent(
         name="chatbot",
-        system_message="For coding tasks, only use the functions you have been provided with. Reply TERMINATE when the task is done. Save the answers to the questions in the variable 'answer'. Please only generate the code.",
+        system_message=system_message,
         llm_config=llm_config,
     )
 
@@ -84,6 +99,7 @@ def main():
         max_consecutive_auto_reply=10,
         code_execution_config={"work_dir": "coding", "use_docker": False},
         config_list=config_list,
+        turn_step_wise_confidence=args.turn_step_wise_confidence,
     )
 
     # register the functions
@@ -122,41 +138,57 @@ def main():
         long_term_memory.append(new_item)
 
     for i in range(args.start_id, args.num_questions):
+        # Progress tracking
+        print(f"\n{'='*60}")
+        print(f"Processing sample {i+1}/{args.num_questions} (ID: {contents[i]['id']})")
+        print(f"{'='*60}")
+        
         # if file is already exist, skip
         file_directory = file_path.format(id=contents[i]['id'])
         if os.path.exists(file_directory):
-            print("File already exists, skipping...")
+            print(f"[SKIP] File already exists: {file_directory}")
             continue
         if args.debug and contents[i]['id'] != args.debug_id:
+            print(f"[SKIP] Debug mode - ID mismatch: {contents[i]['id']} != {args.debug_id}")
             continue
         question = contents[i]['template']
         answer = contents[i]['answer']
+        print(f"Question: {question[:100]}..." if len(question) > 100 else f"Question: {question}")
+        print(f"Expected Answer: {answer}")
         try:
-            # Initialize confidence scorer with conversation ID
-            user_proxy.initialize_confidence_scorer(contents[i]['id'])
+            # Initialize confidence scorer with model-specific directory
+            confidence_log_dir = f"confidence_logs/{args.llm}"
+            user_proxy.initialize_confidence_scorer(contents[i]['id'], confidence_log_dir)
             
             user_proxy.update_memory(args.num_shots, long_term_memory)
             user_proxy.initiate_chat(
                 chatbot,
                 message=question,
+                max_turns=10,
             )
             logs = user_proxy._oai_messages
 
             logs_string = []
+
             logs_string.append(str(question))
             logs_string.append(str(answer))
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print(logs)
             for agent in list(logs.keys()):
                 for j in range(len(logs[agent])):
                     if logs[agent][j]['content'] != None:
                         logs_string.append(logs[agent][j]['content'])
-                    else:
+                    elif logs[agent][j].get('function_call') is not None:
                         argums = logs[agent][j]['function_call']['arguments']
                         if type(argums) == dict and 'cell' in argums.keys():
                             logs_string.append(argums['cell'])
                         else:
                             logs_string.append(argums)
+                    else:
+                        # Handle case where both content and function_call are None/empty
+                        logs_string.append("[Empty response]")
         except Exception as e:
-            print("Error: ", e)
+            print(f"[ERROR] Sample {i+1} failed: {e}")
             logs_string = [str(e)]
         file_directory = file_path.format(id=contents[i]['id'])
         if type(answer) == list:
@@ -170,6 +202,15 @@ def main():
         os.makedirs(os.path.dirname(file_directory), exist_ok=True)
         with open(file_directory, 'w') as f:
             f.write('\n----------------------------------------------------------\n'.join(logs_string))
+        print(f"[SAVED] Results saved to: {file_directory}")
+        
+        # Show completion status
+        elapsed_time = time.time() - start_time
+        avg_time_per_sample = elapsed_time / (i - args.start_id + 1)
+        remaining_samples = args.num_questions - (i + 1)
+        eta = remaining_samples * avg_time_per_sample
+        print(f"[PROGRESS] Completed {i+1}/{args.num_questions} samples")
+        print(f"[TIME] Elapsed: {elapsed_time:.1f}s, Avg: {avg_time_per_sample:.1f}s/sample, ETA: {eta:.1f}s")
         logs_string = '\n----------------------------------------------------------\n'.join(logs_string)
         if '"cell": "' in logs_string:
             last_code_start = logs_string.rfind('"cell": "')

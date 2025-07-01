@@ -11,6 +11,7 @@ python3 ehragent/main.py \
     --data_path data/mimic_iii/valid_preprocessed.json \
     --logs_path logs_llama_mimic \
     --num_questions -1 \
+    --turn_step_wise_confidence \
     --seed 0
 
 echo "MIMIC-III execution completed!"

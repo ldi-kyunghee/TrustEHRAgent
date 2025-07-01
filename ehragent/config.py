@@ -104,9 +104,9 @@ def gemini_config(model: str) -> dict:
     return {
         "model": model,
         "api_key": get_env_var("GOOGLE_API_KEY"),
-        "api_type": "google",
+        "api_type": "openai",  # Use OpenAI-compatible API
         "backend": "google",
-        "base_url": get_env_var("GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/", required=False)
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/"
     }
 
 
@@ -152,37 +152,57 @@ def llm_config_list(seed: int, config_list: list) -> dict:
             if field in config:
                 clean_config[field] = config[field]
         
-        # Handle Together AI: convert to OpenAI-compatible format
+        # Handle Together AI: use autogen's native support
         if config.get('backend') == 'together':
-            clean_config['base_url'] = config.get('base_url', 'https://api.together.xyz/v1')
-            # Together AI uses OpenAI-compatible endpoint
-            if not clean_config['base_url'].endswith('/v1'):
-                clean_config['base_url'] += '/v1'
+            # autogen natively supports api_type="together", no need for base_url
+            clean_config['api_type'] = 'together'
+            # Add hide_tools for better function calling experience
+            # clean_config['hide_tools'] = 'if_all_run'
+        
+        # Handle Gemini: use OpenAI-compatible client
+        elif config.get('backend') == 'google':
+            # Use api_type 'openai' for OpenAI-compatible API
+            clean_config['api_type'] = 'openai'
         
         clean_config_list.append(clean_config)
     
     llm_config_list = {
-        "functions": [
-            {
-                "name": "python",
-                "description": "run the entire code and return the execution result. Only generate the code.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "cell": {
-                            "type": "string",
-                            "description": "Valid Python code to execute.",
-                        }
-                    },
-                    "required": ["cell"],
-                },
-            },
-        ],
         "config_list": clean_config_list,
         "timeout": 120,
         "cache_seed": seed,
         "temperature": 0,
-        "logprobs": True,  # Enable logprobs for confidence calculation
-        "top_logprobs": 5,  # Get top 5 alternative tokens for uncertainty analysis
     }
+    
+    # Add tools for all backends (OpenAI, Together AI, and Gemini use tools format)
+    has_tools_support = any(
+        config.get('backend') in ['openai', 'together', 'google'] for config in config_list
+    )
+    
+    if has_tools_support:
+        llm_config_list["tools"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "python",
+                    "description": "run the entire code and return the execution result. Only generate the code. If you need to write the code only this tool can be used.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "cell": {
+                                "type": "string",
+                                "description": "Valid Python code to execute.",
+                            }
+                        },
+                        "required": ["cell"],
+                    },
+                }
+            }
+        ]
+        # Add tool_choice for function calling
+        llm_config_list["tool_choice"] = "required"  # Required for OpenAI and Gemini function calling
+    
+    # Only add logprobs for OpenAI models
+    if any(config.get('backend') == 'openai' for config in config_list):
+        llm_config_list["logprobs"] = True
+        llm_config_list["top_logprobs"] = 5
     return llm_config_list

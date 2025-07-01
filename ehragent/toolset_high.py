@@ -13,13 +13,25 @@ def run_code(cell):
     """
     Returns the path to the python interpreter.
     """
+    print(f"\n=== FUNCTION CALLED: run_code ===")
+    print(f"Input cell: {cell[:100]}..." if len(cell) > 100 else f"Input cell: {cell}")
+    
+    # Additional cleanup for any remaining artifacts
+    if cell.startswith("```python"):
+        cell = cell.replace("```python", "").replace("```", "").strip()
+    elif cell.startswith("```"):
+        cell = cell.replace("```", "").strip()
+    if "TERMINATE" in cell:
+        cell = cell.replace("TERMINATE", "").strip()
+    
     # import prompts
     from ehragent.prompts_mimic import CodeHeader
     try:
         global_var = {"answer": 0}
         exec(CodeHeader+cell, global_var)
         cell = "\n".join([line for line in cell.split("\n") if line.strip() and not line.strip().startswith("#")])
-        if not 'answer' in cell.split('\n')[-1]:
+        cell_lines = cell.split('\n')
+        if not cell_lines or not 'answer' in cell_lines[-1]:
             return "Please save the answer to the question in the variable 'answer'."
         return str(global_var['answer'])
     except Exception as e:
@@ -67,6 +79,21 @@ def run_code(cell):
         error_info += '\nPlease make modifications accordingly and make sure the rest code works well with the modification.'
 
         return error_info
+
+
+def terminate(message="Task completed"):
+    """
+    Terminate the conversation when the task is completed.
+    
+    Args:
+        message (str): Optional message to include with termination
+    
+    Returns:
+        str: Termination message
+    """
+    print(f"\n=== FUNCTION CALLED: terminate ===")
+    print(f"Termination message: {message}")
+    return "TERMINATE"
 
 
 def llm_agent(config_list):
