@@ -1,6 +1,6 @@
 # 🛡️ TrustEHRAgent ⚕️
 
-[![arXiv](https://img.shields.io/badge/arXiv-TBA-b31b1b.svg)](TBA)
+[![arXiv](https://img.shields.io/badge/arXiv-TBA-b31b1b.svg)](https://arxiv.org/abs/2508.19096)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)  
 
 
