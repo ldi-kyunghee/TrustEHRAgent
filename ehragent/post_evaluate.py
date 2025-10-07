@@ -166,7 +166,6 @@ def visualize_hcacc_comparison(results, output_dir):
         results (dict): Result dictionary with combining_method as key and DataFrame as value
         output_dir (str): Directory path to save result images
     """
-    # 모든 방법의 결과를 병합
     combined_data = []
     for method, df in results.items():
         df_copy = df.copy()
@@ -175,11 +174,9 @@ def visualize_hcacc_comparison(results, output_dir):
     
     combined_df = pd.concat(combined_data, ignore_index=True)
     
-    # 그래프 생성
     plt.figure(figsize=(10, 6))
     sns.set_style("whitegrid")
     
-    # 각 방법별로 색상과 스타일 정의
     colors = {
         'unweighted': '#999999',
         'position': '#C6A300',
@@ -196,7 +193,6 @@ def visualize_hcacc_comparison(results, output_dir):
         'last_step': '--'
     }
     
-    # 각 방법별로 k값에 따른 HcACC 그래프 그리기
     for method in results.keys():
         method_df = combined_df[combined_df['Method'] == method]
         plt.plot(
@@ -210,7 +206,6 @@ def visualize_hcacc_comparison(results, output_dir):
             markevery=10
         )
     
-    # HR 참조선 추가
     for hr_level in [10, 20, 30]:
         ca_level = 100 - hr_level
         plt.axvline(
@@ -230,7 +225,6 @@ def visualize_hcacc_comparison(results, output_dir):
             fontsize=8
         )
     
-    # 그래프 레이블, 제목 등 설정
     plt.xlabel('k%')
     plt.ylabel('HcACC@k%')
     plt.title('HcACC Performance Comparison Across Different Methods')
@@ -238,7 +232,6 @@ def visualize_hcacc_comparison(results, output_dir):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
     
-    # 결과 저장
     output_path = os.path.join(output_dir, 'hcacc_methods_comparison.png')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
