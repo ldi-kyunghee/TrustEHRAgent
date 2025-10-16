@@ -87,6 +87,8 @@ If you find this work useful, please cite:
 
 This work builds upon [EHRAgent](https://github.com/wshi83/EHRAgent). We thank the original authors for their foundational contributions to code-empowered agent systems.
 
+This research was supported by No. RS- 2022-00155911: Artificial Intelligence Convergence Innovation Human Resources Development (Kyung Hee University).
+
 
 <div align="center">
 <strong>⚠️ Important:</strong> This tool is for research purposes only. Always consult healthcare professionals for medical decisions.
